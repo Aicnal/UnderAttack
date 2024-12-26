@@ -1,0 +1,14 @@
+services:
+  attack:
+    image: aicnal/underattack:latest
+    environment:
+      - threshold
+      - recover_threshold
+      - high_duration
+      - low_usage_duration
+      - api_email
+      - api_key
+      - zone_id
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
