@@ -2,6 +2,7 @@ import time
 import os
 from cf import get_domain, under_attack, back_normal, api_key, api_email, zone_id
 import logging
+import docker
 
 # 配置日志
 logging.basicConfig(
@@ -37,20 +38,18 @@ try:
 except Exception as e:
     logging.error(f"获取域名失败: {e}")
 
+client = docker.DockerClient(base_url='unix://var/run/docker.sock')
+
+
 def get_host_cpu_usage():
-    try:
-        with open('/host_proc/stat') as f:
-            lines = f.readlines()
-            for line in lines:
-                if line.startswith('cpu '):
-                    cpu_times = line.split()[1:]
-                    cpu_times = [int(x) for x in cpu_times]
-                    idle_time = cpu_times[3]
-                    total_time = sum(cpu_times)
-                    return 100 * (1 - idle_time / total_time)
-    except FileNotFoundError:
-        logging.error("Host CPU information not available.")
-        return 0
+    info = client.info()
+    total_cpus = info['NCPU']
+    containers = client.containers.list()
+    total_usage = 0
+    for container in containers:
+        stats = container.stats(stream=False)
+        total_usage += stats['cpu_stats']['cpu_usage']['total_usage']
+        return total_cpus
 
 while True:
     cpu_usage = get_host_cpu_usage()
