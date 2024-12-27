@@ -2,7 +2,6 @@ import time
 import os
 from cf import get_domain, under_attack, back_normal, api_key, api_email, zone_id
 import logging
-import docker
 
 # 配置日志
 logging.basicConfig(
@@ -23,7 +22,7 @@ recover_threshold = int(os.environ.get("recover_threshold", 30))  # 恢复模式
 high_durations = int(os.environ.get("high_duration", 10)) * 60
 low_usage_duration = int(os.environ.get("low_usage_duration", 30)) * 60
 
-if api_email is None or api_key is None or zone_id is None:
+if not all([api_email, api_key, zone_id]):
     logging.error("请检查有关Cloudflare环境变量是否正确填写")
     exit(1)
 
@@ -38,18 +37,37 @@ try:
 except Exception as e:
     logging.error(f"获取域名失败: {e}")
 
-client = docker.DockerClient(base_url='unix://var/run/docker.sock')
-
-
 def get_host_cpu_usage():
-    info = client.info()
-    total_cpus = info['NCPU']
-    containers = client.containers.list()
-    total_usage = 0
-    for container in containers:
-        stats = container.stats(stream=False)
-        total_usage += stats['cpu_stats']['cpu_usage']['total_usage']
-        return total_cpus
+    def read_cpu_times():
+        try:
+            with open('/host_proc/stat') as f:
+                lines = f.readlines()
+                for line in lines:
+                    if line.startswith('cpu '):
+                        cpu_times = line.split()[1:]
+                        return [int(x) for x in cpu_times]
+            return None
+        except FileNotFoundError:
+            logging.error("Host CPU information not available.")
+            return None
+
+    try:
+        cpu_times1 = read_cpu_times()
+        if not cpu_times1:
+            return 0
+        time.sleep(1)
+        cpu_times2 = read_cpu_times()
+        if not cpu_times2:
+            return 0
+
+        idle_time1, idle_time2 = cpu_times1[3], cpu_times2[3]
+        total_time1, total_time2 = sum(cpu_times1), sum(cpu_times2)
+        idle_delta = idle_time2 - idle_time1
+        total_delta = total_time2 - total_time1
+        return 100 * (1 - idle_delta / total_delta)
+    except Exception as e:
+        logging.error(f"Error calculating CPU usage: {e}")
+        return 0
 
 while True:
     cpu_usage = get_host_cpu_usage()
