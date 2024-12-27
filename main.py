@@ -17,10 +17,10 @@ console_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(
 logging.getLogger().addHandler(console_handler)
 
 # 获取用户设置阈值，带有默认值
-threshold = int(os.environ.get("threshold", 80))
+threshold = int(os.environ.get("threshold", 80)) # 挨打开启的阈值
 recover_threshold = int(os.environ.get("recover_threshold", 30))  # 恢复模式的CPU阈值
-high_durations = int(os.environ.get("high_duration", 10)) * 60
-low_usage_duration = int(os.environ.get("low_usage_duration", 30)) * 60
+high_durations = int(os.environ.get("high_duration", 10)) * 60 # 持续高占用多长时间触发
+low_usage_duration = int(os.environ.get("low_usage_duration", 30)) * 60 # 降低多长时间后降低
 
 if not all([api_email, api_key, zone_id]):
     logging.error("请检查有关Cloudflare环境变量是否正确填写")
